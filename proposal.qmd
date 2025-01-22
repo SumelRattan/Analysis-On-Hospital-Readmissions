@@ -1,0 +1,114 @@
+---
+title: "A Data Analytics Perspective on Hospital Readmissions"
+subtitle: "Project Proposal"
+author: 
+  - name: "ViZiT"
+    affiliations:
+      - name: "College of Information Science, University of Arizona"
+description: "Data Analysis and Visualization"
+format:
+  html:
+    code-tools: true
+    code-overflow: wrap
+    code-line-numbers: true
+    embed-resources: true
+editor: visual
+code-annotations: hover
+execute:
+  warning: false
+---
+
+```{r}
+#| label: load-pkgs
+#| message: false
+library(tidyverse)
+library(ggplot2)
+library(readr)
+```
+
+## Dataset
+
+```{r}
+#| label: load-dataset
+#| message: false
+df <- read_csv("data/hospital_readmissions.csv")
+```
+
+**Description of the Dataset**
+
+The dataset represents ten years of clinical care at 130 US hospitals and integrated delivery networks. Each row concerns hospital records of patients diagnosed with diabetes, who underwent laboratory, medications, and stayed up to 14 days. The goal is to determine the early readmission of the patient within 30 days of discharge.
+
+```{r}
+# Variable Descriptions
+
+# "age" - Age bracket of the patient (e.g., [50-60), [60-70), etc.)
+# "time_in_hospital" - Number of days the patient stayed in the hospital (ranges from 1 to 14 days)
+# "n_procedures" - Number of procedures performed during the hospital stay
+# "n_lab_procedures" - Number of laboratory procedures performed during the hospital stay
+# "n_medications" - Number of medications administered during the hospital stay
+# "n_outpatient" - Number of outpatient visits in the year before the hospital stay
+# "n_inpatient" - Number of inpatient visits in the year before the hospital stay
+# "n_emergency" - Number of visits to the emergency room in the year before the hospital stay
+# "medical_specialty" - Specialty of the admitting physician (e.g., Cardiology, Internal Medicine)
+# "diag_1" - Primary diagnosis (e.g., Circulatory, Respiratory, Digestive, etc.)
+# "diag_2" - Secondary diagnosis (additional diagnosis besides the primary one)
+# "diag_3" - Additional secondary diagnosis (tertiary diagnosis if applicable)
+# "glucose_test" - Glucose serum level results: high (> 200), normal, or not performed
+# "A1Ctest" - A1C test result: high (> 7%), normal, or not performed
+# "change" - Indicates whether there was a change in diabetes medication ('yes' or 'no')
+# "diabetes_med" - Indicates whether a diabetes medication was prescribed ('yes' or 'no')
+# "readmitted" - Whether the patient was readmitted to the hospital ('yes' or 'no')
+
+```
+
+**Reasons for choosing the dataset**
+
+Hospital readmission is a problem in healthcare where patients are discharged from the hospital and then readmitted within a certain period of time, often within 30 days of their initial discharge. This is a costly and preventable problem that can negatively impact patients' health outcomes and quality of life. The Centers for Medicare and Medicaid Services (CMS) implemented a Hospital Readmissions Reduction Program (HRRP) in 2012, which financially penalizes hospitals with higher-than-expected readmission rates for certain conditions. Causes of readmissions include inadequate care during initial hospitalization and poor discharge planning. Patients with chronic conditions, such as heart failure, diabetes, and respiratory disease, are at a particularly high risk of readmission. To reduce readmissions, interventions such as improved care coordination, enhanced patient education, and medication management are implemented. Machine learning and artificial intelligence (AI) algorithms are also used to predict which patients are at the highest risk of readmission and enable healthcare providers to intervene proactively to prevent readmissions.
+
+**Shape of the dataset**
+
+```{r}
+dim(df)
+```
+
+There are 17 variables containing 25000 observations.
+
+**Data Pre-processing and general summary of the dataset**
+
+We will handle data pre-processing in several key steps: first, understanding the dataset through inspection, summary statistics, and checking data types. Next, handle missing data by identifying gaps and either removing rows/columns with excessive missing values or imputing them using methods like mean, median, or advanced techniques. Additionally, we will check for and address inconsistencies, duplicates, and outliers.We also need to ensure that data types are correct and in standardized formats (e.g., dates, text). Finally if needed, normalize or scale numerical data, and encode categorical data to prepare it for analysis or modeling, ensuring a clean and consistent dataset ready for further use.
+
+## **Questions**:
+
+Q1) What are the key demographic and clinical factors that influence hospital readmission rates?
+
+Objective: To identify the most significant demographic (age, medical specialty etc) and clinical factors (length of stay, number of procedures, etc.) that contribute to hospital readmissions.
+
+Variables to Include: - \`age\` - \`medical_specialty\` - \`time_in_hospital\` - \`n_lab_procedures\` - \`n_procedures\` - \`n_medications\` - \`readmitted\`
+
+Proposed Analysis: 1. Perform descriptive statistics to identify predictors of readmission. 2. Create a correlation heatmap to visualize relationships among variables. 3. Use bar plots and box plots to explore differences in readmission rates across age groups and medical specialties.4.Conduct statistical tests like chi-squared to establish the significance of differences in readmission rates between diabetic and non-diabetic patients.
+
+------------------------------------------------------------------------
+
+Q2) Some doctors believe diabetes might play a central role in readmission. Explore the effect of a diabetes diagnosis on readmission rates. Objective: To validate the hypothesis that a diabetes diagnosis significantly impacts readmission rates.
+
+Variables to Include: -\`diag_1\`, \`diag_2\`, \`diag_3\` -\`readmitted\`
+
+Proposed Analysis: [1.]{.underline} Conduct Chi-square tests for each diagnosis category to assess its impact on readmissions. [2.]{.underline} Visualize results with bar plots comparing the proportion of readmissions for diabetic vs. non-diabetic patients. [3.]{.underline} Highlight significant differences to guide healthcare interventions for diabetic patients.
+
+------------------------------------------------------------------------
+
+Q3) How do prior healthcare utilization and patient characteristics influence readmission, and which groups should be prioritized for follow-up care? Objective: To determine which factors (including previous healthcare visits, diagnoses, and treatments) predict hospital readmission, and identify high-risk groups that require focused follow-up.
+
+Variables to Include: -n_outpatient\`, \`n_inpatient\`, \`n_emergency\` -\`age\` -\`medical_specialty\` -\`time_in_hospital\`, \`n_medications\`, \`n_procedures\` -\`diag_1\`, \`diag_2\`, \`diag_3\` -\`diabetes_med\`, \`change\` -\`readmitted\`
+
+Proposed Analysis : [1.]{.underline}Perform some predictive modelling to identify key predictors of readmission.
+
+**Weekly-Plan**
+
+| **Task Name**                                    | **Status**  | **Assignee**                  | **Due Date**   | **Priority** | **Summary**                                                                                           |
+|:-----------|:-----------|:-----------|------------|:-----------|:-----------|
+| Data Cleaning and preparation                    | In Progress | Anushree,Junaid,Krishna,Sumel | week of Nov 11 | High         | Clean data (remove missing values, format dates, standardize variables).                              |
+| Exploratory Data analysis (EDA)                  | Pending     | Anushree,Junaid,Krishna,Sumel | week of Nov 11 | High         | Explore basic statistics and distributions of variables.                                              |
+| Analysis and visualization of Q1 & partial Q2.   | Pending     | Anushree,Junaid,Krishna,Sumel | week of Nov 18 | HIgh         | Explore patterns and relationship between variables to arrive at best possible analysis of Q1 and Q2. |
+| Analysis and visualization of partial Q2 and Q3. | Pending     | Anushree,Junaid,Krishna,Sumel | week of Nov 25 | High         | Explore patterns and relationship between variables to arrive at best possible analysis of Q2 and Q3. |
+| PPT,Poster,Report writing                        | Pending     | Anushree,Junaid,Krishna,Sumel | week of Dec 02 | High         | Compile findings into a cohesive report with visualizations and conclusions.                          |

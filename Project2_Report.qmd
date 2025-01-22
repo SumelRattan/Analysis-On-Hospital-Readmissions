@@ -1,0 +1,1093 @@
+---
+title: "A Data Analytics Perspective on Hospital Readmissions"
+subtitle: "Project2 Report"
+author: 
+  - name: "ViZiT"
+    affiliations:
+      - name: "College of Information Science, University of Arizona"
+description: "Data Analysis and Visualization"
+format: html
+editor: visual
+---
+
+**Summary**:
+
+Hospital readmissions have become a major concern in the healthcare industry in recent years. When patients are discharged from the hospital, they are expected to recover fully and not require readmission. However, some patients end up being readmitted, which can be expensive and negatively impact their health. This report will explore the causes and consequences of hospital readmissions and the measures that can be taken to prevent them. A better understanding of the differences between people requiring hospitalization may translate into more effective ways to prevent readmissions.
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+```
+
+**Description of the Dataset**
+
+The dataset represents ten years of clinical care at 130 US hospitals and integrated delivery networks.This report analyzes a dataset of 25,000 hospital records to identify risk factors associated with readmission. The study examined 17 variables in each record, with the primary outcome being readmission for any cause.
+
+**Information about the variables:**
+
+-   "age" - age bracket of the patient
+
+-   "time_in_hospital" - days (from 1 to 14)
+
+-   "n_procedures" - number of procedures performed during the hospital stay
+
+-   "n_lab_procedures" - number of laboratory procedures performed during the hospital stay
+
+-   "n_medications" - number of medications administered during the hospital stay
+
+-   "n_outpatient" - number of outpatient visits in the year before a hospital stay
+
+-   "n_inpatient" - number of inpatient visits in the year before the hospital stay
+
+-   "n_emergency" - number of visits to the emergency room in the year before the hospital stay
+
+-   "medical_specialty" - the specialty of the admitting physician
+
+-   "diag_1" - primary diagnosis (Circulatory, Respiratory, Digestive, etc.)
+
+-   "diag_2" - secondary diagnosis
+
+-   "diag_3" - additional secondary diagnosis
+
+-   "glucose_test" - whether the glucose serum came out as high (\> 200), normal, or not performed
+
+-   "A1Ctest" - whether the A1C level of the patient came out as high (\> 7%), normal, or not performed
+
+-   "change" - whether there was a change in the diabetes medication ('yes' or 'no')
+
+-   "diabetes_med" - whether a diabetes medication was prescribed ('yes' or 'no')
+
+-   "readmitted" - if the patient was readmitted at the hospital ('yes' or 'no')
+
+```{r}
+
+df <- read.csv("hospital_readmissions.csv")
+head(df)
+dim(df)
+
+```
+
+**Reasons for choosing the dataset**
+
+Hospital readmission is a problem in healthcare where patients are discharged from the hospital and then readmitted within a certain period of time, often within 30 days of their initial discharge. This is a costly and preventable problem that can negatively impact patients’ health outcomes and quality of life. The Centers for Medicare and Medicaid Services (CMS) implemented a Hospital Readmissions Reduction Program (HRRP) in 2012, which financially penalizes hospitals with higher-than-expected readmission rates for certain conditions. Causes of readmissions include inadequate care during initial hospitalization and poor discharge planning. Patients with chronic conditions, such as heart failure, diabetes, and respiratory disease, are at a particularly high risk of readmission. To reduce readmissions, interventions such as improved care coordination, enhanced patient education, and medication management are implemented. Machine learning and artificial intelligence (AI) algorithms are also used to predict which patients are at the highest risk of readmission and enable healthcare providers to intervene proactively to prevent readmissions.
+
+Checking for missing values:
+
+```{r Missing values check}
+missing_count <- sapply(df, function(col) sum(is.na(col)))
+
+# Display the result
+missing_count
+```
+
+Unique Levels in each categorical column:
+
+```{r unique levels}
+char_columns <- sapply(df, is.character)
+
+
+for (col in names(df)[char_columns]) {
+  cat("Unique values in column:", col, "\n")
+  print(unique(df[[col]]))
+  cat("\n") 
+}
+```
+
+### **Q1) What are the key demographic and clinical factors that influence hospital readmission rates?**
+
+Objective: To identify the most significant demographic (age, medical specialty etc) and clinical factors (length of stay, number of procedures, etc.) that contribute to hospital readmissions.
+
+**Fig 1. Countplot of Categorical Variables**
+
+```{r fig.width=20, fig.height=10}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(ggpubr)
+library(grid)
+library(gridExtra)
+
+# Reshape the dataframe to long format and calculate percentages
+df_long <- df %>%
+  select(where(is.character)) %>%  # Include all character-type columns, including readmitted
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value") %>%
+  group_by(variable, value) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(variable) %>%
+  mutate(percentage = (count / sum(count)) * 100)  # Calculate percentages
+
+# Generate individual plots for each variable
+plots <- df_long %>%
+  group_by(variable) %>%
+  group_split() %>%
+  lapply(function(sub_df) {
+    ggplot(sub_df, aes(x = value, y = percentage, fill = value)) +
+      geom_bar(stat = "identity") +  # Use percentages instead of raw counts
+      theme_minimal() +
+      theme(
+        panel.grid = element_blank(),                # Remove gridlines
+        axis.text.x = element_text(angle = 90, hjust = 1, size = 16),  # Rotate and enlarge x-axis labels
+        axis.text.y = element_text(size = 16),       # Enlarge y-axis labels
+        legend.position = "none",                   # Remove legend
+        plot.title = element_text(                  # Format title
+          size = 20,                                # Smaller size
+          face = "bold",                            # Bold text
+          hjust = 0.5                               # Center title
+        )
+      ) +
+      labs(
+        title = unique(sub_df$variable),  # Add centered plot-specific title
+        x = NULL,                         # Remove x-axis label
+        y = "%"                           # Change y-axis label to %
+      ) +
+      scale_fill_manual(values = scales::hue_pal()(length(unique(sub_df$value))))
+  })
+
+# Arrange the plots in a 5x2 grid
+combined_plot <- ggarrange(
+  plotlist = plots,
+  ncol = 5, nrow = 2  # Set number of columns and rows
+)
+
+# Add a common title with spacing using gridExtra
+final_plot <- grid.arrange(
+  textGrob("Barplot of Categorical Variables (in %)", 
+           gp = gpar(fontface = "bold", fontsize = 30),  # Common title format
+           hjust = 0.5),                                # Center the title
+  combined_plot,
+  heights = c(0.1, 1)                                  # Adjust height ratio for title and plots
+)
+
+# Display the final plot
+final_plot
+
+
+```
+
+**Important findings from Fig 1 :**
+
+1.  Variables unrelated to diabetes:
+
+    1.  The most frequent primary, secondary, and other diagnoses were circulatory and other, with notable mentions being respiratory for primary diagnoses and diabetes and respiratory for secondary and tertiary diagnoses.
+
+    2.  The majority of patients were between 60 and 90 years old.
+
+    3.  Patient management was primarily categorized as missing, with internal medicine and other categories following in frequency.
+
+    4.  Around 47% of the patients are readmitted.
+
+Variables related to diabetes:
+
+1.  Most A1C tests performed showed elevated values.
+
+2.  Few blood glucose tests were performed, with a similar proportion of elevated vs. normal results.
+
+3.  Nearly half of the patients had their diabetes medication changed.
+
+4.  Approximately 75% of patients were prescribed medication classified for diabetes.
+
+**Table 1. Summary of numerical variables:**
+
+```{r Summary}
+# Load required libraries
+library(dplyr)
+library(tidyr)
+library(gt)
+
+# Calculate summary statistics for all numeric columns in df
+summary_table <- df %>%
+  select(where(is.numeric)) %>%  # Select all numeric columns
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Value") %>%  # Reshape to long format
+  group_by(Variable) %>%  # Group by variable name
+  summarise(
+    mean = mean(Value, na.rm = TRUE),        # Calculate mean
+    std = sd(Value, na.rm = TRUE),          # Calculate standard deviation
+    min = min(Value, na.rm = TRUE),         # Minimum value
+    `25%` = quantile(Value, 0.25, na.rm = TRUE), # 25th percentile
+    `50%` = median(Value, na.rm = TRUE),    # Median (50th percentile)
+    `75%` = quantile(Value, 0.75, na.rm = TRUE), # 75th percentile
+    max = max(Value, na.rm = TRUE)          # Maximum value
+  )
+
+# Create a styled table using gt
+styled_table <- summary_table %>%
+  gt() %>%
+  tab_header(
+    title = "Summary Statistics for Numeric Columns",
+    subtitle = "This table summarizes key statistics for each numeric variable in the dataset"
+  ) %>%
+  fmt_number(
+    columns = c(mean, std, min, `25%`, `50%`, `75%`, max),
+    decimals = 2  # Format numbers with 2 decimal places
+  ) %>%
+  cols_label(
+    Variable = "Numeric Variable",
+    mean = "Mean",
+    std = "Std Dev",
+    min = "Minimum",
+    `25%` = "25th Percentile",
+    `50%` = "Median",
+    `75%` = "75th Percentile",
+    max = "Maximum"
+  ) %>%
+  tab_style(
+    style = list(
+      cell_text(weight = "bold")
+    ),
+    locations = cells_column_labels(everything())  # Bold column labels
+  )
+
+# Print the table
+styled_table
+
+```
+
+**Fig 2. Boxplot of numerical variables:**
+
+```{r Boxplot}
+# Load required libraries
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# Select numeric columns and reshape the dataframe to long format
+df_long_numeric <- df %>%
+  select(where(is.numeric)) %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value")
+
+# Create a combined horizontal box plot
+ggplot(df_long_numeric, aes(x = value, y = variable, fill = variable)) +
+  geom_boxplot() +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 12),         # Adjust y-axis label size
+    axis.text.x = element_text(size = 10),         # Adjust x-axis label size
+    plot.title = element_text(size = 14,           # Title formatting
+                              face = "bold", 
+                              hjust = 0.5),        # Center the title
+    panel.grid.major = element_blank(),            # Remove major grid lines
+    panel.grid.minor = element_blank(),            # Remove minor grid lines
+    legend.position = "none"                       # Remove the legend
+  ) +
+  labs(
+    title = "Box Plots for All Numeric Columns",   # Centered and bold title
+    x = "Value",
+    y = "Variable"
+  ) +
+  scale_fill_brewer(palette = "Set3")             # Add colors to boxes
+
+```
+
+**Important findings from Table 1 & Fig 2:**
+
+1.  Most variables showed outliers, with a higher frequency in medical services (inpatient, outpatient, emergency) and number of medications.
+
+2.  The average length of hospital stay was 4.45 days.
+
+3.  The average number of laboratory procedures was 43.24.
+
+4.  The average number of medications used was 16.25.
+
+**Fig 3. Primary Diagnosis by age group**
+
+```{r fig.width=25, fig.height=12}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(gridExtra)
+
+# Define a fixed color palette for diag_1 categories
+unique_diag_1 <- unique(df$diag_1)  # Get unique categories of diag_1
+color_palette <- setNames(RColorBrewer::brewer.pal(length(unique_diag_1), "Set1"), unique_diag_1)
+
+# Calculate percentages of diag_1 categories by age
+df_percentage <- df %>%
+  group_by(age, diag_1) %>%  # Group by age and diag_1
+  summarise(count = n(), .groups = "drop") %>%  # Count occurrences
+  group_by(age) %>%
+  mutate(percentage = count / sum(count) * 100)  # Calculate percentage
+
+# Create individual plots for each age group
+plots <- df_percentage %>%
+  group_split(age) %>%
+  lapply(function(sub_df) {
+    ggplot(sub_df, aes(x = percentage, y = diag_1, fill = diag_1)) +
+      geom_bar(stat = "identity") +
+      geom_text(aes(label = paste0(round(percentage, 1), "%")), hjust = -0.05, size = 6) +  # Increased size of labels
+      theme_minimal() +
+      theme(
+        panel.grid = element_blank(),                # Remove gridlines
+        axis.text.x = element_blank(),               # Remove x-axis labels
+        axis.text.y = element_text(size = 16),       # Enlarge y-axis labels
+        axis.ticks.x = element_blank(),              # Remove x-axis ticks
+        legend.position = "none",                   # Remove legend
+        plot.title = element_text(                  # Format title
+          size = 20,                                # Adjust size
+          face = "bold",                            # Bold text
+          hjust = 0.5                               # Center title
+        )
+      ) +
+      labs(
+        title = paste("Age Group:", unique(sub_df$age)),  # Add centered plot-specific title
+        x = NULL,                         # Remove x-axis label
+        y = NULL                          # Remove y-axis label
+      ) +
+      scale_fill_manual(values = color_palette)  # Use consistent colors
+  })
+
+# Arrange the plots in a 4x2 grid without displaying
+combined_plot <- arrangeGrob(
+  grobs = plots,
+  ncol = 3, nrow = 2  # Set number of columns and rows
+)
+
+# Add a common title with spacing (display only final plot)
+final_plot <- grid.arrange(
+  textGrob(
+    "Primary Diagnosis by Age Group (%)", 
+    gp = gpar(fontface = "bold", fontsize = 30),  # Common title format
+    hjust = 0.5                                  # Center the title
+  ),
+  combined_plot,
+  heights = c(0.1, 1)                            # Adjust height ratio for title and plots
+)
+
+# Display only the final plot
+final_plot
+
+```
+
+**Important findings from Fig 3:**
+
+It is shown that the main diagnoses for all age groups are circulatory and others. We can classify the prevalence (in order) of diagnoses into three groups as follows:
+
+-   40-50: other, circulatory, respiratory, diabetes, digestive.
+
+-   50-60: circulatory, other, respiratory, digestive, diabetes.
+
+-   60-100: circulatory, other, respiratory, digestive, trauma (wounds).
+
+**Conclusion:**
+
+We have a predominantly elderly population who are mostly admitted for circulatory and unspecified (other) causes. The majority of the classification regarding care was not recorded (missing), and the vast majority did not have glucose or hemoglobin A1C tests performed. The average number of laboratory procedures and medications per patient is high relative to the length of hospital stay. All of this may indicate that our population has high comorbidity and polypharmacy, which may justify the high readmission rates.
+
+### **Q2) Some doctors believe diabetes might play a central role in readmission. Explore the effect of a diabetes diagnosis on readmission rates. Objective: To validate the hypothesis that a diabetes diagnosis significantly impacts readmission rates.**
+
+This question requires us to check if the doctors assumption that diabetes plays a central role in readmission is true. We will be running a hypothesis test to see if there is a relationship between a diabetes diagnosis and readmission rates.
+
+Since the variables we are going to be comparing are categorical variables, the test we will be using will be a chi-square test for independence. Also, there are 3 diagnosis columns, so we will be conducting 3 seperate test to determine which of them has a significant effect on readmission rates.
+
+Let's start by definig our **hypotheses:**
+
+-   **Null hypothesis (H0): There is no relationship between diabetes diagnosis and the readmission rates.**
+
+-   **Alternative hypothesis (Ha): There is a significant relationship between diabetes diagnosis and the readmission rates.**
+
+Now, that we have defined the hypotheses, we will use the columns "diag_1", "diag_2", "diag_3" to create new columns called diabetes_diag1,diabetes_diag2 and diabetes_diag3 respectively to have "Diabetes" and "Not diabetes" values in them.
+
+Lastly, let's set a significance level of 5%.
+
+-   If the p-value is \< or = the significance level, we reject the null hypothesis and adopt the alternative hypothesis;
+
+If the p-value is \> the significance level, we retain the null hypothesis.
+
+**Table 2. Primary diagnosis vs readmission rates**
+
+```{r}
+library(dplyr)
+library(gt)
+
+# Step 1: Create the new column diabetes_diag1
+df <- df %>%
+  mutate(diabetes_diag1 = ifelse(diag_1 == "Diabetes", "Diabetes", "No Diabetes"))
+
+# Step 2: Compute counts for the table
+summary_table <- df %>%
+  group_by(diabetes_diag1, readmitted) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  pivot_wider(
+    names_from = readmitted,
+    values_from = count,
+    names_prefix = "Readmitted: "
+  ) %>%
+  rename(
+    `Diabetes Diagnosis` = diabetes_diag1,
+    `Has Been Readmitted` = `Readmitted: yes`,
+    `Not Been Readmitted` = `Readmitted: no`
+  ) %>%
+  replace(is.na(.), 0)  # Replace NAs with 0
+
+# Step 3: Create a table using gt
+gt_table <- summary_table %>%
+  gt() %>%
+  tab_header(
+    title = "Counts of Patients by Primary Diabetes Diagnosis and Readmission",
+    subtitle = "Readmission Status"
+  ) %>%
+  fmt_number(
+    columns = c(`Has Been Readmitted`, `Not Been Readmitted`),
+    decimals = 0  # Format numbers as integers
+  ) %>%
+  cols_label(
+    `Diabetes Diagnosis` = "Diabetes or Not",
+    `Has Been Readmitted` = "Has Been Readmitted",
+    `Not Been Readmitted` = "Not Been Readmitted"
+  ) %>%
+  tab_style(
+    style = list(
+      cell_text(weight = "bold")
+    ),
+    locations = cells_column_labels(everything())  # Bold column labels
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold", size = px(16)), # Make subtitle bold and same size
+    locations = cells_title(groups = "subtitle")      # Target the subtitle
+  ) %>%
+  tab_style(
+    style = cell_text(size = px(16)),                 # Ensure column labels match subtitle size
+    locations = cells_column_labels(everything())    # Target all column labels
+  )
+
+# Display the gt table
+gt_table
+
+
+```
+
+Chi- Square Test:
+
+```{r}
+# Create a contingency table for diabetes_diag1 and readmitted
+contingency_table <- table(df$diabetes_diag1, df$readmitted)
+
+# Perform the chi-square test of independence
+chi_square_result <- chisq.test(contingency_table)
+
+
+
+# Print the results of the chi-square test
+print("Chi-Square Test Result:")
+print(chi_square_result)
+
+```
+
+Here the p-value \<0.05 and so we have to reject the null hypothesis and take on the alternative hypothesis. In this case, we can come to a conclusion that there is indeed a statistically significant relationship between diabetes diagnosis 1 and readmissions.
+
+**Fig 4. Readmission Status of Patients with Primary Diabetes Diagnosis**
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Filter data for diabetes_diag1 = "Diabetes"
+diabetes_data <- df %>%
+  filter(diabetes_diag1 == "Diabetes") %>%
+  group_by(readmitted) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  mutate(percentage = count / sum(count) * 100)
+
+# Create a pie chart
+ggplot(diabetes_data, aes(x = "", y = percentage, fill = readmitted)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +  # Transform to pie chart
+  labs(
+    title = "Readmission Status of Patients with Primary Diabetes Diagnosis",
+    fill = "Readmitted"
+  ) +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5)) +  # Add percentage labels
+  theme_void() +  # Remove unnecessary plot elements
+  theme(
+    plot.title = element_text(hjust = 0.1, size = 14, face = "bold"),  # Bold centered title
+    legend.title = element_text(face = "bold")
+  )
+
+```
+
+Around 53.6 % of patients with primary diabetes diagnosis are readmitted.
+
+**Fig 5. Readmitted Status by Age Group for Primary Diabetes Diagnosis**
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Filter data for diabetes_diag1 = "Diabetes"
+bar_data <- df %>%
+  filter(diabetes_diag1 == "Diabetes") %>%
+  group_by(age, readmitted) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(age) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+# Create the bar chart
+ggplot(bar_data, aes(x = age, y = percentage, fill = readmitted)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_y_continuous(
+    breaks = seq(0, 100, by = 10),  # Set Y-axis breaks at intervals of 10
+    labels = function(x) paste0(x, "%")  # Add '%' symbol to labels
+  ) +
+  labs(
+    title = "Readmitted Status by Age Group for Primary Diabetes Diagnosis",
+    x = "Age Group",
+    y = "%"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid = element_blank(),  # Remove grid lines
+    axis.line = element_blank(),   # Remove x and y axis lines
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),  # Bold x-axis labels
+    axis.title.x = element_text(face = "bold"),  # Bold x-axis title
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),  # Center and style the title
+    legend.title = element_text(face = "bold")
+  ) +
+  scale_fill_manual(values = c("no" = "#F8766D", "yes" = "#00BFC4"))  # Default ggplot colors
+
+
+```
+
+The 70–80 age group with a primary diagnosis of diabetes appears to have the highest rate of hospital readmissions.
+
+**Table 3. Secondary diagnosis vs readmission rates**
+
+```{r}
+library(dplyr)
+library(gt)
+
+# Step 1: Create the new column diabetes_diag2
+df <- df %>%
+  mutate(diabetes_diag2 = ifelse(diag_2 == "Diabetes", "Diabetes", "No Diabetes"))
+
+# Step 2: Compute counts for the table
+summary_table <- df %>%
+  group_by(diabetes_diag2, readmitted) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  pivot_wider(
+    names_from = readmitted,
+    values_from = count,
+    names_prefix = "Readmitted: "
+  ) %>%
+  rename(
+    `Diabetes Diagnosis` = diabetes_diag2,
+    `Has Been Readmitted` = `Readmitted: yes`,
+    `Not Been Readmitted` = `Readmitted: no`
+  ) %>%
+  replace(is.na(.), 0)  # Replace NAs with 0
+
+# Step 3: Create a table using gt
+gt_table <- summary_table %>%
+  gt() %>%
+  tab_header(
+    title = "Counts of Patients by Secondary Diabetes Diagnosis and Readmission",
+    subtitle = "Readmission Status"
+  ) %>%
+  fmt_number(
+    columns = c(`Has Been Readmitted`, `Not Been Readmitted`),
+    decimals = 0  # Format numbers as integers
+  ) %>%
+  cols_label(
+    `Diabetes Diagnosis` = "Diabetes or Not",
+    `Has Been Readmitted` = "Has Been Readmitted",
+    `Not Been Readmitted` = "Not Been Readmitted"
+  ) %>%
+  tab_style(
+    style = list(
+      cell_text(weight = "bold")
+    ),
+    locations = cells_column_labels(everything())  # Bold column labels
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold", size = px(16)), # Make subtitle bold and same size
+    locations = cells_title(groups = "subtitle")      # Target the subtitle
+  ) %>%
+  tab_style(
+    style = cell_text(size = px(16)),                 # Ensure column labels match subtitle size
+    locations = cells_column_labels(everything())    # Target all column labels
+  )
+
+# Display the gt table
+gt_table
+
+```
+
+Chi- Square Test:
+
+```{r}
+# Create the diabetes_diag2 column
+df <- df %>%
+  mutate(diabetes_diag2 = ifelse(diag_2 == "Diabetes", "Diabetes", "No Diabetes"))
+
+# Create a contingency table for diabetes_diag2 and readmitted
+contingency_table_diag2 <- table(df$diabetes_diag2, df$readmitted)
+
+# Perform the chi-square test of independence
+chi_square_result_diag2 <- chisq.test(contingency_table_diag2)
+
+
+# Print the results of the chi-square test
+print("Chi-Square Test Result for diabetes_diag2 and readmitted:")
+print(chi_square_result_diag2)
+
+```
+
+Here the p-value \<0.05 and so we have to reject the null hypothesis and take on the alternative hypothesis. In this case, we can come to a conclusion that there is indeed a statistically significant relationship between diabetes diagnosis 2 and readmissions.
+
+**Fig 6. Readmission Status of Patients with Secondary Diabetes Diagnosis**
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Filter data for diabetes_diag2 = "Diabetes"
+diabetes_data <- df %>%
+  filter(diabetes_diag2 == "Diabetes") %>%
+  group_by(readmitted) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  mutate(percentage = count / sum(count) * 100)
+
+# Create a pie chart
+ggplot(diabetes_data, aes(x = "", y = percentage, fill = readmitted)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +  # Transform to pie chart
+  labs(
+    title = "Readmission Status of Patients with Secondary Diabetes Diagnosis",
+    fill = "Readmitted"
+  ) +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5)) +  # Add percentage labels
+  theme_void() +  # Remove unnecessary plot elements
+  theme(
+    plot.title = element_text(hjust = 0.1, size = 14, face = "bold"),  # Bold centered title
+    legend.title = element_text(face = "bold")
+  )
+
+```
+
+Around 44.2 % of patients with secondary diabetes diagnosis are readmitted which is less than patients with primary diabetes diagnosis.
+
+**Fig 7. Readmitted Status by Age Group for Secondary Diabetes Diagnosis**
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Filter data for diabetes_diag2 = "Diabetes"
+bar_data <- df %>%
+  filter(diabetes_diag2 == "Diabetes") %>%
+  group_by(age, readmitted) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(age) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+# Create the bar chart
+ggplot(bar_data, aes(x = age, y = percentage, fill = readmitted)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_y_continuous(
+    breaks = seq(0, 100, by = 10),  # Set Y-axis breaks at intervals of 10
+    labels = function(x) paste0(x, "%")  # Add '%' symbol to labels
+  ) +
+  labs(
+    title = "Readmitted Status by Age Group for Secondary Diabetes Diagnosis",
+    x = "Age Group",
+    y = "%"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid = element_blank(),  # Remove grid lines
+    axis.line = element_blank(),   # Remove x and y axis lines
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),  # Bold x-axis labels
+    axis.title.x = element_text(face = "bold"),  # Bold x-axis title
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),  # Center and style the title
+    legend.title = element_text(face = "bold")
+  ) +
+  scale_fill_manual(values = c("no" = "#F8766D", "yes" = "#00BFC4"))  # Default ggplot colors
+
+```
+
+The 80–90 age group with a secondary diagnosis of diabetes appears to have the highest rate of hospital readmissions.
+
+**Table 4: Tertiary diagnosis and Readmission rates**
+
+```{r}
+library(dplyr)
+library(gt)
+
+# Step 1: Create the new column diabetes_diag3
+df <- df %>%
+  mutate(diabetes_diag3 = ifelse(diag_3 == "Diabetes", "Diabetes", "No Diabetes"))
+
+# Step 2: Compute counts for the table
+summary_table <- df %>%
+  group_by(diabetes_diag3, readmitted) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  pivot_wider(
+    names_from = readmitted,
+    values_from = count,
+    names_prefix = "Readmitted: "
+  ) %>%
+  rename(
+    `Diabetes Diagnosis` = diabetes_diag3,
+    `Has Been Readmitted` = `Readmitted: yes`,
+    `Not Been Readmitted` = `Readmitted: no`
+  ) %>%
+  replace(is.na(.), 0)  # Replace NAs with 0
+
+# Step 3: Create a table using gt
+gt_table <- summary_table %>%
+  gt() %>%
+  tab_header(
+    title = "Counts of Patients by Tertiary Diabetes Diagnosis and Readmission",
+    subtitle = "Readmission Status"
+  ) %>%
+  fmt_number(
+    columns = c(`Has Been Readmitted`, `Not Been Readmitted`),
+    decimals = 0  # Format numbers as integers
+  ) %>%
+  cols_label(
+    `Diabetes Diagnosis` = "Diabetes or Not",
+    `Has Been Readmitted` = "Has Been Readmitted",
+    `Not Been Readmitted` = "Not Been Readmitted"
+  ) %>%
+  tab_style(
+    style = list(
+      cell_text(weight = "bold")
+    ),
+    locations = cells_column_labels(everything())  # Bold column labels
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold", size = px(16)), # Make subtitle bold and same size
+    locations = cells_title(groups = "subtitle")      # Target the subtitle
+  ) %>%
+  tab_style(
+    style = cell_text(size = px(16)),                 # Ensure column labels match subtitle size
+    locations = cells_column_labels(everything())    # Target all column labels
+  )
+
+# Display the gt table
+gt_table
+
+```
+
+Chi-Square test
+
+```{r}
+library(dplyr)
+
+# Create the diabetes_diag3 column
+df <- df %>%
+  mutate(diabetes_diag3 = ifelse(diag_3 == "Diabetes", "Diabetes", "No Diabetes"))
+
+# Create a contingency table for diabetes_diag3 and readmitted
+contingency_table_diag3 <- table(df$diabetes_diag3, df$readmitted)
+
+# Perform the chi-square test of independence
+chi_square_result_diag3 <- chisq.test(contingency_table_diag3)
+
+
+
+# Print the results of the chi-square test
+print("Chi-Square Test Result for diabetes_diag3 and readmitted:")
+print(chi_square_result_diag3)
+
+```
+
+Here the p-value \> 0.05 and so we fail to reject the null hypothesis. In this case, we can come to a conclusion that there is indeed no statistically significant relationship between diabetes diagnosis 3 and readmissions.
+
+**Conclusion:**
+
+A connection exists between hospital readmissions and patients with primary and secondary diabetes conditions.
+
+### Q3) How do prior healthcare utilization and patient characteristics influence readmission, and which groups should be prioritized for follow-up care?
+
+Objective: To determine which factors (including previous healthcare visits, diagnoses, and treatments) predict hospital readmission, and identify high-risk groups that require focused follow-up.
+
+Dropping diabetes_diag1, diabetes_diag2 & diabetes_diag3 from the main dataframe.
+
+```{r}
+df <- df %>%
+  select(-c(diabetes_diag1, diabetes_diag2, diabetes_diag3))
+```
+
+Converting categorical variables to factors.
+
+```{r}
+df <- df %>%
+  mutate(across(where(is.character), as.factor))
+```
+
+**Univariate analysis using Logistic regression to find some risk and protective factors for readmission in our population.**
+
+Only significant variables with p\< 0.05 with their 95% CI will be used.
+
+```{r}
+library(dplyr)
+library(broom)
+
+# Step 1: Create an empty dataframe for significant results
+df_sig <- data.frame(
+  Variable = character(),
+  Term = character(),
+  OddsRatio = numeric(),
+  CI_Lower = numeric(),
+  CI_Upper = numeric(),
+  PValue = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# Step 2: Logistic regression for numerical variables
+numerical_vars <- df %>%
+  select(where(is.numeric)) %>%
+  names()
+
+for (var in numerical_vars) {
+  formula <- as.formula(paste("readmitted ~", var))
+  model <- glm(formula, data = df, family = binomial)
+  results <- tidy(model, conf.int = TRUE, exponentiate = TRUE) %>%  # Get odds ratio and CI
+    filter(term != "(Intercept)" & p.value < 0.05)  # Exclude intercept and filter significant results
+  if (nrow(results) > 0) {
+    results <- results %>%
+      mutate(Variable = var) %>%
+      select(Variable, term, estimate, conf.low, conf.high, p.value) %>%
+      rename(
+        Term = term,
+        OddsRatio = estimate,
+        CI_Lower = conf.low,
+        CI_Upper = conf.high,
+        PValue = p.value
+      )
+    df_sig <- bind_rows(df_sig, results)
+  }
+}
+
+# Step 3: Logistic regression for categorical variables
+factor_vars <- df %>%
+  select(where(is.factor)) %>%
+  select(-readmitted) %>%
+  names()
+
+for (var in factor_vars) {
+  formula <- as.formula(paste("readmitted ~", var))
+  model <- glm(formula, data = df, family = binomial)
+  results <- tidy(model, conf.int = TRUE, exponentiate = TRUE) %>%
+    filter(term != "(Intercept)" & p.value < 0.05)  # Exclude intercept and filter significant results
+  if (nrow(results) > 0) {
+    results <- results %>%
+      mutate(Variable = var) %>%
+      select(Variable, term, estimate, conf.low, conf.high, p.value) %>%
+      rename(
+        Term = term,
+        OddsRatio = estimate,
+        CI_Lower = conf.low,
+        CI_Upper = conf.high,
+        PValue = p.value
+      )
+    df_sig <- bind_rows(df_sig, results)
+  }
+}
+
+# Display the significant results dataframe
+print("Significant Results:")
+print(df_sig)
+
+```
+
+**Fig 8. Forest Plot of Odd Ratio \>1**
+
+Risk factors for readmission were identified through univariate analysis using logistic regression the higher the factor the greater the likelihood of being readmitted.
+
+```{r}
+library(ggplot2)
+
+# Forest Plot for Odds Ratio > 1 (Sorted in Descending Order)
+filtered_results_gt1 <- df_sig %>% filter(OddsRatio > 1) %>% arrange(desc(OddsRatio))
+ggplot(filtered_results_gt1, aes(x = OddsRatio, y = reorder(Term, -OddsRatio))) +
+  geom_point(size = 3, color = "blue") +  # Points are blue
+  geom_errorbarh(aes(xmin = CI_Lower, xmax = CI_Upper), height = 0.2, color = "blue") +  # CI lines are blue
+  geom_vline(xintercept = 1, linetype = "dashed", color = "black") +  # Reference line is black
+  scale_x_continuous(trans = "log10") +
+  labs(
+    title = "Forest Plot for Risk factors for readmission,Odds Ratio > 1",
+    x = "Odds Ratio,95% CI,p < 0.05",
+    y = "Variable"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.9, face = "bold", size = 12),  # Center and bold title
+    axis.title = element_text(face = "bold"),  # Bold axis titles
+    axis.text.y = element_text(size = 10),  # Adjust size of variable names
+    axis.text.x = element_text(size = 12)   # Adjust size of x-axis labels
+  )
+
+
+
+```
+
+From Fig 8, we find that the use of healthcare services in the previous year, especially previous hospitalizations and number of visits to the emergency room , when a diabetes medication was prescribed and when the primary diagnosis was diabetes are among the most important risk factors for patients getting readmitted.
+
+**Fig 9. Forest Plot of Odd Ratio \<1**
+
+Protective factors for readmission were identified through univariate analysis using logistic regression the smaller the factor the greater the likelihood of not being readmitted.
+
+```{r}
+# Forest Plot for Odds Ratio < 1 (Sorted in Ascending Order)
+filtered_results_lt1 <- df_sig %>% filter(OddsRatio < 1) %>% arrange(OddsRatio)
+ggplot(filtered_results_lt1, aes(x = OddsRatio, y = reorder(Term, OddsRatio))) +
+  geom_point(size = 3, color = "blue") +  # Points are blue
+  geom_errorbarh(aes(xmin = CI_Lower, xmax = CI_Upper), height = 0.2, color = "blue") +  # CI lines are blue
+  geom_vline(xintercept = 1, linetype = "dashed", color = "black") +  # Reference line is black
+  scale_x_continuous(trans = "log10") +
+  labs(
+    title = "Forest Plot for Protective factors for readmission,Odds Ratio < 1",
+    x = "Odds Ratio,95% CI,p < 0.05",
+    y = "Variable"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 12),  # Center and bold title
+    axis.title = element_text(face = "bold"),  # Bold axis titles
+    axis.text.y = element_text(size = 10),  # Adjust size of variable names
+    axis.text.x = element_text(size = 12)   # Adjust size of x-axis labels
+  )
+
+```
+
+Regarding protective factors (Fig 9), the most notable was a missing tertiary diagnosis, which can be interpreted in two ways:
+
+1.  It may highlight a need to improve the classification of patients if the diagnosis was not accurately recorded.
+
+2.  Patients with only one or two diagnoses, indicating fewer comorbidities, likely faced a lower risk of readmission.
+
+Other protective factors included having a primary musculoskeletal diagnosis and a secondary injury diagnosis.
+
+**Multivariate analysis using Logistic regression to find some risk and protective factors for readmission in our population.**
+
+```{r}
+df <- df %>%
+  mutate(across(where(is.character), as.factor))
+str(df)
+```
+
+```{r}
+# Convert readmitted to 1 for "yes" and 0 for "no" while keeping it as a factor
+df <- df %>%
+  mutate(readmitted = factor(ifelse(readmitted == "yes", 1, 0)))
+
+# Verify the changes
+cat("Updated readmitted variable:\n")
+print(levels(df$readmitted))
+table(df$readmitted)
+
+```
+
+**Multivariate logistic regression**
+
+```{r}
+library(broom)
+
+# Ensure `readmitted` is coded correctly as a binary factor
+df <- df %>%
+  mutate(readmitted = factor(readmitted, levels = c(0, 1)))  # 0 for no, 1 for yes
+
+# Fit the multiple logistic regression model
+model <- glm(readmitted ~ ., data = df, family = binomial)
+
+# Summarize the model
+summary(model)
+
+# Extract coefficients, p-values, odds ratios, and confidence intervals
+results <- tidy(model, conf.int = TRUE, exponentiate = TRUE) %>%
+  rename(
+    Variable = term,
+    OddsRatio = estimate,
+    CI_Lower = conf.low,
+    CI_Upper = conf.high,
+    PValue = p.value
+  )
+
+# Display significant results (p < 0.05)
+significant_results <- results %>% filter(PValue < 0.05)
+
+#cat("Significant Variables (p < 0.05):\n")
+#print(significant_results)
+
+```
+
+**Fig 10. Forest plot for Risk and Protective factors for readmission using multivariate logistic regression**
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+
+# Check if there are significant variables
+if (nrow(significant_results) == 0) {
+  stop("No significant variables (p < 0.05) to plot.")
+}
+
+# Reorder variables for better visualization (sorted by Odds Ratio)
+significant_results <- significant_results %>%
+  arrange(OddsRatio) %>%
+  mutate(Variable = reorder(Variable, OddsRatio))
+
+# Create the forest plot
+# Exclude the intercept from the significant results
+filtered_results <- significant_results %>% filter(Variable != "(Intercept)")
+
+# Create the forest plot
+ggplot(filtered_results, aes(x = OddsRatio, y = Variable)) +
+  geom_point(size = 3, color = "blue") +  # Points for odds ratios
+  geom_errorbarh(aes(xmin = CI_Lower, xmax = CI_Upper), height = 0.2, color = "blue") +  # CI lines
+  geom_vline(xintercept = 1, linetype = "dashed", color = "black") +  # Reference line at Odds Ratio = 1
+  scale_x_continuous(trans = "log10") +  # Log scale for odds ratios
+  labs(
+    title = "Forest plot for Risk and Protective factors for readmission \n using multivariate logistic regression",
+    x = "Odds Ratio, 95% CI, p < 0.05",
+    y = "Variables"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.3, face = "bold", size = 12),  # Center and bold title
+    axis.title = element_text(face = "bold"),  # Bold axis titles
+    axis.text.y = element_text(size = 10),  # Adjust size of variable names
+    axis.text.x = element_text(size = 12)   # Adjust size of x-axis labels
+  )
+
+
+```
+
+The main **risk factors** are confirmed to be the use of healthcare services in the previous year, primary diagnosis of diabetes, and prescription of medications for diabetes.Ages 70-90 seem to be at a greater risk.
+
+For the **protective factors**, we found the missing tertiary diagnosis (with the same considerations mentioned above) and the specialty of general surgery.
+
+### Conclusion:
+
+-   Readmission rate: 11,754 people (47.01%).
+
+-   The top 5 primary diagnoses for each age group can be classified by frequency in the following order:
+
+    -   (40-50): other, circulatory, respiratory, diabetes, digestive.
+
+    -   (50-60): circulatory, other, respiratory, digestive, diabetes.
+
+    -   (60-100): circulatory, other, respiratory, digestive, trauma (wounds).
+
+-   Statistically significant relationship between primary diabetes diagnosis and readmissions with 53.6% of people with primary diabetes diagnosis being readmitted.
+
+-   Statistically significant relationship between secondary diabetes diagnosis and readmissions with 44.2% of people with secondary diabetes diagnosis being readmitted.
+
+-   Patients with the following characteristics are more likely to be readmitted compared to the general population:
+
+    -   Patients with visits in the previous year to inpatient and emergency.
+
+    -   Patients with a primary diagnosis of diabetes and prescribed medication for diabetes at hospital discharge.
+
+    -   Ages 70-90 group; the ages 70-80 have a higher proportion of readmission given they have diabetes.
+
+-   Patients with the following characteristics are less likely to be readmitted:
+
+    -   Patients whose tertiary diagnosis is not there which might mean mean they have less co-morbidities.
+
+    -   Treated by internal medicine, surgery or other services.
+
+    -   Patients with a primary diagnosis of others, injury or musculoskeletal.
