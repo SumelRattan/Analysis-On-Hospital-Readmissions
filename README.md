@@ -1,3 +1,4 @@
+![Poster](https://github.com/user-attachments/assets/15e0a02e-cc08-43f5-be70-d07cc8c4b570)
 Description of the Dataset
 
 The dataset represents ten years of clinical care at 130 US hospitals and integrated delivery networks. Each row concerns hospital records of patients diagnosed with diabetes, who underwent laboratory, medications, and stayed up to 14 days. The goal is to determine the early readmission of the patient within 30 days of discharge.
